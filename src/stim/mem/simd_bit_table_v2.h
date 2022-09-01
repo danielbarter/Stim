@@ -32,11 +32,9 @@ template <size_t W>
 
 struct simd_bit_table_v2 {
 
-    /// num_minor_bits_padded is always a multiple of W
-    /// TODO: num_minor_bits_padded should only be settable through a setter method
-    /// which asserts that num_minor_bits_padded % W == 0
+
     size_t num_major_bits_padded;
-    size_t num_minor_bits_padded;
+    size_t num_minor_bits_padded; /// num_minor_bits_padded is always a multiple of W
     size_t num_major_bits;
     size_t num_minor_bits;
 
@@ -79,7 +77,7 @@ struct simd_bit_table_v2 {
     ///
     /// Returns:
     ///     A simd_bit_table with cell contents corresponding to the text.
-    static simd_bit_table_v2 from_text(const char *text);
+    static simd_bit_table_v2 from_text(const char *text, size_t min_rows, size_t min_cols);
 
 
 };
@@ -121,9 +119,8 @@ std::string simd_bit_table_v2<W>::str() const {
     return out.str();
 }
 
-
 template <size_t W>
-simd_bit_table_v2<W> simd_bit_table_v2<W>::from_text(const char *text) {
+simd_bit_table_v2<W> simd_bit_table_v2<W>::from_text(const char *text, size_t min_rows, size_t min_cols) {
     std::vector<std::vector<bool>> lines;
     lines.push_back({});
 
@@ -157,19 +154,18 @@ simd_bit_table_v2<W> simd_bit_table_v2<W>::from_text(const char *text) {
         lines.pop_back();
     }
 
-    size_t num_cols = 0;
+    size_t num_cols = min_cols;
     for (const auto &v : lines) {
         num_cols = std::max(v.size(), num_cols);
     }
-
-    size_t num_rows = 0;
-    num_rows = std::max(num_rows, lines.size());
+    size_t num_rows = std::max(min_rows, lines.size());
     simd_bit_table_v2<W> out(num_rows, num_cols);
     for (size_t row = 0; row < lines.size(); row++) {
         for (size_t col = 0; col < lines[row].size(); col++) {
             out[row][col] = lines[row][col];
         }
     }
+
     return out;
 }
 

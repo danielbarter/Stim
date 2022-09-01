@@ -300,15 +300,25 @@ TEST_EACH_WORD_SIZE_W(simd_bit_table_v2, creation, {
         simd_bit_table_v2<W>::from_text(
             "1.\n"
             "0._1\n"
-            ".1..")
+            ".1..", 0, 0)
             .str(),
         "1...\n"
         "...1\n"
         ".1..");
 
-    // simd_bit_table<W> t = simd_bit_table<W>::from_text("", 512, 256);
-    // ASSERT_EQ(t.num_minor_bits_padded(), 256);
-    // ASSERT_EQ(t.num_major_bits_padded(), 512);
+    ASSERT_EQ(simd_bit_table<W>(0, 5).str(), "");
+
+    simd_bit_table_v2<W> t1 = simd_bit_table_v2<W>::from_text("", 512, 256);
+    ASSERT_EQ(t1.num_minor_bits_padded, 256);
+    ASSERT_EQ(t1.num_major_bits_padded, 512);
+
+    simd_bit_table_v2<W> t2 = simd_bit_table_v2<W>::from_text("", 509, 255);
+    ASSERT_EQ(t2.num_minor_bits_padded, 256);
+    ASSERT_EQ(t2.num_major_bits_padded, 509);
+
+    simd_bit_table_v2<W> t3 = simd_bit_table_v2<W>::from_text("", 513, 257);
+    ASSERT_EQ(t3.num_minor_bits_padded, 256 + W);
+    ASSERT_EQ(t3.num_major_bits_padded, 513);
 
 
     })
