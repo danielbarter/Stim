@@ -270,6 +270,45 @@ TEST(simd_bit_table, lg) {
 
 /// v2 testing
 
-TEST_EACH_WORD_SIZE_W(simd_bit_table_v2, initialization, {
-        simd_bit_table_v2<W> t(1,1);
+
+TEST_EACH_WORD_SIZE_W(simd_bit_table_v2, creation, {
+    simd_bit_table_v2<W> a(3, 3);
+    ASSERT_EQ(
+        a.str(),
+        "...\n"
+        "...\n"
+        "...");
+    a[1][2] = 1;
+    ASSERT_EQ(
+        a.str(),
+        "...\n"
+        "..1\n"
+        "...");
+
+    ASSERT_EQ(
+        simd_bit_table_v2<W>::identity(3).str(),
+        "1..\n"
+        ".1.\n"
+        "..1");
+
+    ASSERT_EQ(
+        simd_bit_table_v2<W>::identity(2).str(),
+        "1.\n"
+        ".1");
+
+    ASSERT_EQ(
+        simd_bit_table_v2<W>::from_text(
+            "1.\n"
+            "0._1\n"
+            ".1..")
+            .str(),
+        "1...\n"
+        "...1\n"
+        ".1..");
+
+    // simd_bit_table<W> t = simd_bit_table<W>::from_text("", 512, 256);
+    // ASSERT_EQ(t.num_minor_bits_padded(), 256);
+    // ASSERT_EQ(t.num_major_bits_padded(), 512);
+
+
     })
