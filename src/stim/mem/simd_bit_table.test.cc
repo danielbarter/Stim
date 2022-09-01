@@ -13,6 +13,8 @@
 // limitations under the License.
 
 #include "stim/mem/simd_bit_table.h"
+#include "stim/mem/simd_bit_table_v2.h"
+
 
 #include "gtest/gtest.h"
 
@@ -265,3 +267,9 @@ TEST(simd_bit_table, lg) {
     ASSERT_EQ(lg(8), 3);
     ASSERT_EQ(lg(9), 3);
 }
+
+/// v2 testing
+
+TEST_EACH_WORD_SIZE_W(simd_bit_table_v2, initialization, {
+        simd_bit_table_v2<W> t(1,1);
+    })
