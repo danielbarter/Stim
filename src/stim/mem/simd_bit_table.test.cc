@@ -320,5 +320,18 @@ TEST_EACH_WORD_SIZE_W(simd_bit_table_v2, creation, {
     ASSERT_EQ(t3.num_minor_bits_padded, 256 + W);
     ASSERT_EQ(t3.num_major_bits_padded, 513);
 
-
     })
+
+TEST_EACH_WORD_SIZE_W(simd_bit_table_v2, equality, {
+    simd_bit_table_v2<W> a(3, 3);
+    simd_bit_table_v2<W> b(3, 3);
+    simd_bit_table_v2<W> c(511, 1000);
+    simd_bit_table_v2<W> d(511, 1000);
+    ASSERT_EQ(a, b);
+    ASSERT_EQ(c, d);
+    ASSERT_NE(a, c);
+    a[0][1] = 1;
+    ASSERT_NE(a, b);
+    d[500][900] = 1;
+    ASSERT_NE(c, d);
+})

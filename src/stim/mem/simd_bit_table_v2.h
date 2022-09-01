@@ -18,6 +18,7 @@
 #define _STIM_MEM_SIMD_BIT_TABLE_V2_H
 
 #include <sstream>
+#include <cassert>
 
 #include "stim/mem/simd_bits.h"
 
@@ -46,6 +47,10 @@ struct simd_bit_table_v2 {
         return num_minor_bits_padded / W;
     }
 
+    inline bool is_square() const {
+        return num_major_bits == num_minor_bits;
+    }
+
     /// Returns a reference to a row (column) of the table, when using row (column) major indexing.
     inline simd_bits_range_ref<W> operator[](size_t major_index) {
         size_t num_simd_words_minor = this->num_simd_words_minor();
@@ -56,6 +61,12 @@ struct simd_bit_table_v2 {
         size_t num_simd_words_minor = this->num_simd_words_minor();
         return data.word_range_ref(major_index * num_simd_words_minor, num_simd_words_minor);
     }
+
+    /// Equality. For two simd_bit_tables to be equal, they need to have the same shape,
+    /// padding and data values
+    bool operator==(const simd_bit_table_v2 &other) const;
+    /// Inequality.
+    bool operator!=(const simd_bit_table_v2 &other) const;
 
     /// Creates a square table with 1s down the diagonal.
     static simd_bit_table_v2 identity(size_t n);
@@ -79,6 +90,16 @@ struct simd_bit_table_v2 {
     ///     A simd_bit_table with cell contents corresponding to the text.
     static simd_bit_table_v2 from_text(const char *text, size_t min_rows, size_t min_cols);
 
+    /// Transposes the table inplace.
+    void do_square_transpose();
+    /// Transposes the table out of place into a target location.
+    void transpose_into(simd_bit_table_v2 &out) const;
+    /// Transposes the table out of place.
+    simd_bit_table_v2 transposed() const;
+
+    /// Square matrix multiplication (assumes row major indexing).
+    simd_bit_table_v2 square_mat_mul(const simd_bit_table_v2 &rhs) const;
+
 
 };
 
@@ -94,6 +115,8 @@ simd_bit_table_v2<W>::simd_bit_table_v2(size_t num_major_bits, size_t num_minor_
       num_major_bits(num_major_bits),
       num_minor_bits(num_minor_bits),
       data(min_bits_to_num_bits_padded<W>(num_minor_bits) * num_major_bits) {
+
+    assert(data.num_simd_words * W == num_major_bits_padded * num_minor_bits_padded);
 }
 
 template <size_t W>
@@ -103,6 +126,20 @@ simd_bit_table_v2<W> simd_bit_table_v2<W>::identity(size_t n) {
         result[k][k] = true;
     }
     return result;
+}
+
+template <size_t W>
+bool simd_bit_table_v2<W>::operator==(const simd_bit_table_v2<W> &other) const {
+    return num_major_bits == other.num_major_bits
+        && num_minor_bits == other.num_minor_bits
+        && num_major_bits_padded == other.num_major_bits_padded
+        && num_minor_bits_padded == other.num_minor_bits_padded
+        && data == other.data;
+}
+
+template <size_t W>
+bool simd_bit_table_v2<W>::operator!=(const simd_bit_table_v2<W> &other) const {
+    return !(*this == other);
 }
 
 template <size_t W>
@@ -169,6 +206,40 @@ simd_bit_table_v2<W> simd_bit_table_v2<W>::from_text(const char *text, size_t mi
     return out;
 }
 
+template <size_t W>
+void exchange_low_indices(simd_bit_table_v2<W> &table) {
+    for (size_t maj_high = 0; maj_high < table.num_simd_words_major; maj_high++) {
+        auto *block_start = table.data.ptr_simd + (maj_high << bitword<W>::BIT_POW) * table.num_simd_words_minor;
+        for (size_t min_high = 0; min_high < table.num_simd_words_minor; min_high++) {
+            bitword<W>::inplace_transpose_square(block_start + min_high, table.num_simd_words_minor);
+        }
+    }
+}
+
+template <size_t W>
+void simd_bit_table_v2<W>::do_square_transpose() {
+    assert(is_square());
+
+    // Current address tensor indices: [...min_low ...min_high ...maj_low ...maj_high]
+
+    exchange_low_indices(*this);
+
+    // Current address tensor indices: [...maj_low ...min_high ...min_low ...maj_high]
+
+    // Permute data such that high address bits of majors and minors are exchanged.
+    for (size_t maj_high = 0; maj_high < num_simd_words_major; maj_high++) {
+        for (size_t min_high = maj_high + 1; min_high < num_simd_words_minor; min_high++) {
+            for (size_t maj_low = 0; maj_low < W; maj_low++) {
+                std::swap(
+                    data.ptr_simd[(maj_low + (maj_high << bitword<W>::BIT_POW)) * num_simd_words_minor + min_high],
+                    data.ptr_simd[(maj_low + (min_high << bitword<W>::BIT_POW)) * num_simd_words_minor + maj_high]
+                );
+            }
+        }
+    }
+
+    // Current address tensor indices: [...maj_low ...maj_high ...min_low ...min_high]
+}
 
 }  // namespace stim
 
