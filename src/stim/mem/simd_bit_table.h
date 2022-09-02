@@ -18,11 +18,12 @@
 #define _STIM_MEM_SIMD_BIT_TABLE_H
 
 #include "stim/mem/simd_bits.h"
+#include <cassert>
 
 namespace stim {
 
 /// struct for storing row size relative to some word size
-struct row_padding_size {
+struct relative_size {
     size_t number_of_words;
     size_t remaining_bits;
 };
@@ -41,10 +42,10 @@ struct simd_bit_table {
 private:
     size_t num_bits_major_padded;
     size_t num_bits_minor_padded; // always divisble by W
-
-public:
     size_t num_bits_major;
     size_t num_bits_minor;
+
+public:
     simd_bits<W> data;
 
     /// Creates zero initialized table.
@@ -108,72 +109,172 @@ public:
     void clear();
 
     /// Number of simd words in a column (row) + remaining bits assuming row (column) major indexing.
-    inline row_padding_size num_major_simd_padded() const {
+    inline relative_size num_major_simd() const {
         size_t d = W;
-        row_padding_size result;
-        result.number_of_words = num_bits_major_padded / d;
-        result.remaining_bits = num_bits_major_padded % d;
+        relative_size result;
+        result.number_of_words = num_bits_major / d;
+        result.remaining_bits = num_bits_major % d;
         return result;
     }
     /// Number of 64 bit words in a column (row) + remaining bits assuming row (column) major indexing.
-    inline row_padding_size num_major_u64_padded() const {
+    inline relative_size num_major_u64() const {
         size_t d = 8 * sizeof(uint64_t);
-        row_padding_size result;
-        result.number_of_words = num_bits_major_padded / d;
-        result.remaining_bits = num_bits_major_padded % d;
+        relative_size result;
+        result.number_of_words = num_bits_major / d;
+        result.remaining_bits = num_bits_major % d;
         return result;
     }
     /// Number of 32 bit words in a column (row) + remaining bits assuming row (column) major indexing.
-    inline row_padding_size num_major_u32_padded() const {
+    inline relative_size num_major_u32() const {
         size_t d = 8 * sizeof(uint32_t);
-        row_padding_size result;
-        result.number_of_words = num_bits_major_padded / d;
-        result.remaining_bits = num_bits_major_padded % d;
+        relative_size result;
+        result.number_of_words = num_bits_major / d;
+        result.remaining_bits = num_bits_major % d;
         return result;
     }
     /// Number of 16 bit words in a column (row) + remaining bits assuming row (column) major indexing.
-    inline row_padding_size num_major_u16_padded() const {
+    inline relative_size num_major_u16() const {
         size_t d = 8 * sizeof(uint16_t);
-        row_padding_size result;
-        result.number_of_words = num_bits_major_padded / d;
-        result.remaining_bits = num_bits_major_padded % d;
+        relative_size result;
+        result.number_of_words = num_bits_major / d;
+        result.remaining_bits = num_bits_major % d;
         return result;
     }
     /// Number of 8 bit words in a column (row) + remaining bits assuming row (column) major indexing.
-    inline row_padding_size num_major_u8_padded() const {
+    inline relative_size num_major_u8() const {
         size_t d = 8 * sizeof(uint8_t);
-        row_padding_size result;
+        relative_size result;
+        result.number_of_words = num_bits_major / d;
+        result.remaining_bits = num_bits_major % d;
+        return result;
+    }
+    /// Number of bits in a column (row) assuming row (column) major indexing.
+    inline size_t num_major_bits() const {
+        return num_bits_major;
+    }
+
+    /// Number of simd words in a row (column) assuming row (column) major indexing.
+    inline relative_size num_minor_simd() const {
+        size_t d = W;
+        relative_size result;
+        result.number_of_words = num_bits_minor / d;
+        result.remaining_bits = num_bits_minor % d;
+        return result;
+    }
+    /// Number of 64 bit words in a row (column) assuming row (column) major indexing.
+    inline relative_size num_minor_u64() const {
+        size_t d = 8 * sizeof(uint64_t);
+        relative_size result;
+        result.number_of_words = num_bits_minor / d;
+        result.remaining_bits = num_bits_minor % d;
+        return result;
+    }
+    /// Number of 32 bit words in a row (column) assuming row (column) major indexing.
+    inline relative_size num_minor_u32() const {
+        size_t d = 8 * sizeof(uint32_t);
+        relative_size result;
+        result.number_of_words = num_bits_minor / d;
+        result.remaining_bits = num_bits_minor % d;
+        return result;
+
+    }
+    /// Number of 16 bit words in a row (column) assuming row (column) major indexing.
+    inline relative_size num_minor_u16() const {
+        size_t d = 8 * sizeof(uint16_t);
+        relative_size result;
+        result.number_of_words = num_bits_minor / d;
+        result.remaining_bits = num_bits_minor % d;
+        return result;
+
+    }
+    /// Number of 8 bit words in a row (column) assuming row (column) major indexing.
+    inline relative_size num_minor_u8() const {
+        size_t d = 8 * sizeof(uint8_t);
+        relative_size result;
+        result.number_of_words = num_bits_minor / d;
+        result.remaining_bits = num_bits_minor % d;
+        return result;
+
+    }
+    /// Number of bits in a row (column) assuming row (column) major indexing.
+    inline size_t num_minor_bits() const {
+        return num_bits_minor;
+    }
+
+
+    /// Number of simd words in a padded column (row) + remaining bits assuming row (column) major indexing.
+    inline relative_size num_major_simd_padded() const {
+        size_t d = W;
+        relative_size result;
         result.number_of_words = num_bits_major_padded / d;
         result.remaining_bits = num_bits_major_padded % d;
         return result;
     }
-    /// Number of bits in a column (row) assuming row (column) major indexing.
+    /// Number of 64 bit words in a padded column (row) + remaining bits assuming row (column) major indexing.
+    inline relative_size num_major_u64_padded() const {
+        size_t d = 8 * sizeof(uint64_t);
+        relative_size result;
+        result.number_of_words = num_bits_major_padded / d;
+        result.remaining_bits = num_bits_major_padded % d;
+        return result;
+    }
+    /// Number of 32 bit words in a padded column (row) + remaining bits assuming row (column) major indexing.
+    inline relative_size num_major_u32_padded() const {
+        size_t d = 8 * sizeof(uint32_t);
+        relative_size result;
+        result.number_of_words = num_bits_major_padded / d;
+        result.remaining_bits = num_bits_major_padded % d;
+        return result;
+    }
+    /// Number of 16 bit words in a padded column (row) + remaining bits assuming row (column) major indexing.
+    inline relative_size num_major_u16_padded() const {
+        size_t d = 8 * sizeof(uint16_t);
+        relative_size result;
+        result.number_of_words = num_bits_major_padded / d;
+        result.remaining_bits = num_bits_major_padded % d;
+        return result;
+    }
+    /// Number of 8 bit words in a padded column (row) + remaining bits assuming row (column) major indexing.
+    inline relative_size num_major_u8_padded() const {
+        size_t d = 8 * sizeof(uint8_t);
+        relative_size result;
+        result.number_of_words = num_bits_major_padded / d;
+        result.remaining_bits = num_bits_major_padded % d;
+        return result;
+    }
+    /// Number of bits in a padded column (row) assuming row (column) major indexing.
     inline size_t num_major_bits_padded() const {
         return num_bits_major_padded;
     }
 
-    /// Number of simd words in a row (column) assuming row (column) major indexing.
+    /// Number of simd words in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_simd_padded() const {
+        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded / W;
     }
-    /// Number of 64 bit words in a row (column) assuming row (column) major indexing.
+    /// Number of 64 bit words in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_u64_padded() const {
+        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded / (8 * sizeof(uint64_t));
     }
-    /// Number of 32 bit words in a row (column) assuming row (column) major indexing.
+    /// Number of 32 bit words in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_u32_padded() const {
+        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded / (8 * sizeof(uint32_t));
     }
-    /// Number of 16 bit words in a row (column) assuming row (column) major indexing.
+    /// Number of 16 bit words in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_u16_padded() const {
+        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded / (8 * sizeof(uint16_t));
     }
-    /// Number of 8 bit words in a row (column) assuming row (column) major indexing.
+    /// Number of 8 bit words in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_u8_padded() const {
+        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded / (8 * sizeof(uint8_t));
     }
-    /// Number of bits in a row (column) assuming row (column) major indexing.
+    /// Number of bits in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_bits_padded() const {
+        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded;
     }
 

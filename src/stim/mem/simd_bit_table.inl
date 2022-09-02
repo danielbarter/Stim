@@ -96,26 +96,56 @@ simd_bit_table<W> simd_bit_table<W>::inverse_assuming_lower_triangular(size_t n)
     return result;
 }
 
-template <size_t W>
-void exchange_low_indices(simd_bit_table<W> &table) {
-    for (size_t maj_high = 0; maj_high < table.num_simd_words_major; maj_high++) {
-        auto *block_start = table.data.ptr_simd + (maj_high << bitword<W>::BIT_POW) * table.num_simd_words_minor;
-        for (size_t min_high = 0; min_high < table.num_simd_words_minor; min_high++) {
-            bitword<W>::inplace_transpose_square(block_start + min_high, table.num_simd_words_minor);
-        }
-    }
-}
+/// Lets say that a word has W bits and we have a matrix
+///
+/// A11  A12  ...  A1n
+/// A21  A22  ...  A2n
+///           ...
+/// An1  An2  ...  Ann
+///
+/// Aij consists of W words (W * W bits), and it is stored in
+/// memory with stride n * W bits. In order to do a bitwise
+/// transpose, we need to first bitwise transpose each Aij and then
+/// swap Aij with Aji. We have inplace_transpose_square(bitword<W>
+/// *data, size_t stride) which handles the first part and std::swap
+/// which handles the second part.
+///
+/// Now, suppose that we are in a situation without major axis
+/// padding. Now we have a matrix which looks like this
+///
+/// A11  A12  ...  A1n
+/// A21  A22  ...  A2n
+///           ...
+/// Bn1  Bn2  ...  Bnn
+///
+/// where Aij still consists of W words, but Bnj might have
+/// fewer. Now I am imagining that we proceed as follows: for the Aij
+/// blocks, transpose them inplace using
+/// inplace_transpose_square. Allocate an array C of W words on
+/// the stack (and zero it out). Swaps that don't involve the last row
+/// can happen in place as before. For swapping Bnj and Ajn, copy
+/// Bnj into C. Call inplace_transpose_square on C (with stride
+/// 0). Swap C and Ajn, and then copy the required rows from C
+/// back into Bnj. For Bnn we just copy it to C, transpose it and
+/// then copy the required rows back into Bnn.
+
 
 template <size_t W>
 void simd_bit_table<W>::do_square_transpose() {
-    assert(num_simd_words_minor == num_simd_words_major);
+    assert(num_bits_minor == num_bits_major);
+
+
 
     // Current address tensor indices: [...min_low ...min_high ...maj_low ...maj_high]
+    for (size_t maj_high = 0; maj_high < num_major_simd().number_of_words; maj_high++) {
+        auto *block_start = data.ptr_simd + (maj_high << bitword<W>::BIT_POW) * num_simd_words_minor;
+        for (size_t min_high = 0; min_high < num_simd_words_minor; min_high++) {
+            bitword<W>::inplace_transpose_square(block_start + min_high, num_simd_words_minor);
+        }
+    }
 
-    exchange_low_indices(*this);
 
     // Current address tensor indices: [...maj_low ...min_high ...min_low ...maj_high]
-
     // Permute data such that high address bits of majors and minors are exchanged.
     for (size_t maj_high = 0; maj_high < num_simd_words_major; maj_high++) {
         for (size_t min_high = maj_high + 1; min_high < num_simd_words_minor; min_high++) {
