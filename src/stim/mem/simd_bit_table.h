@@ -153,7 +153,7 @@ public:
         return num_bits_major;
     }
 
-    /// Number of simd words in a row (column) assuming row (column) major indexing.
+    /// Number of simd words in a row (column) + remaining bits assuming row (column) major indexing.
     inline relative_size num_minor_simd() const {
         size_t d = W;
         relative_size result;
@@ -161,7 +161,7 @@ public:
         result.remaining_bits = num_bits_minor % d;
         return result;
     }
-    /// Number of 64 bit words in a row (column) assuming row (column) major indexing.
+    /// Number of 64 bit words in a row (column) + remaining bits assuming row (column) major indexing.
     inline relative_size num_minor_u64() const {
         size_t d = 8 * sizeof(uint64_t);
         relative_size result;
@@ -169,7 +169,7 @@ public:
         result.remaining_bits = num_bits_minor % d;
         return result;
     }
-    /// Number of 32 bit words in a row (column) assuming row (column) major indexing.
+    /// Number of 32 bit words in a row (column) + remaining bits assuming row (column) major indexing.
     inline relative_size num_minor_u32() const {
         size_t d = 8 * sizeof(uint32_t);
         relative_size result;
@@ -178,7 +178,7 @@ public:
         return result;
 
     }
-    /// Number of 16 bit words in a row (column) assuming row (column) major indexing.
+    /// Number of 16 bit words in a row (column) + remaining bits assuming row (column) major indexing.
     inline relative_size num_minor_u16() const {
         size_t d = 8 * sizeof(uint16_t);
         relative_size result;
@@ -187,7 +187,7 @@ public:
         return result;
 
     }
-    /// Number of 8 bit words in a row (column) assuming row (column) major indexing.
+    /// Number of 8 bit words in a row (column) + remaining bits assuming row (column) major indexing.
     inline relative_size num_minor_u8() const {
         size_t d = 8 * sizeof(uint8_t);
         relative_size result;
