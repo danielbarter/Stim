@@ -17,7 +17,7 @@
 #include <cstring>
 #include <sstream>
 
-#include "stim/mem/simd_bit_table.h"
+// #include "stim/mem/simd_bit_table.h"
 
 namespace stim {
 
@@ -25,9 +25,9 @@ template <size_t W>
 simd_bit_table<W>::simd_bit_table(size_t num_bits_major, size_t num_bits_minor)
     : num_bits_major(num_bits_major),
       num_bits_minor(num_bits_minor),
-      num_bits_major_padded(num_bits_major),
+      num_bits_major_padded(min_bits_to_num_bits_padded<W>(num_bits_major)),
       num_bits_minor_padded(min_bits_to_num_bits_padded<W>(num_bits_minor)),
-      data(num_bits_major * min_bits_to_num_bits_padded<W>(num_bits_minor)) {}
+      data(num_bits_major_padded * num_bits_minor_padded) {}
 
 
 
@@ -128,10 +128,20 @@ simd_bit_table<W> simd_bit_table<W>::inverse_assuming_lower_triangular(size_t n)
 /// Bnn we just copy it to C, transpose it and then copy the required
 /// rows back into Bnn.
 
-template <size_t W>
+
 /// return the pointer to the first row of an simd block.
+template <size_t W>
 inline bitword<W> *simd_bit_table<W>::block_start(size_t maj, size_t min) const {
     return data.ptr_simd + maj * W * num_minor_simd_padded() + min;
+}
+
+
+/// zero out a W x W bit array
+template <size_t W>
+void clear_bitword_array(bitword<W> *c) {
+    for (size_t row = 0; row < W; row++) {
+        (*(c + row))^(*(c + row));
+    }
 }
 
 template <size_t W>
@@ -155,19 +165,20 @@ void simd_bit_table<W>::do_square_transpose() {
         for (size_t min = maj + 1; min < num_major_simd().number_of_words; min++) {
             for (size_t row = 0; row < W; row++) {
                 std::swap(
-                    block_start(maj,min) + row * num_minor_simd_padded(),
-                    block_start(min,maj) + row * num_minor_simd_padded()
+                    *(block_start(maj,min) + row * num_minor_simd_padded()),
+                    *(block_start(min,maj) + row * num_minor_simd_padded())
                 );
             }
         }
     }
 
-    if (num_major_simd().remaining_bits != 0) {
+    if (! is_major_padded()) {
         size_t maj = num_major_simd().number_of_words;
 
         // handle Bnn
         {
-            bitword<W> c[W] = { 0 };
+            bitword<W> c[W];
+            clear_bitword_array(c);
             bitword<W> *block = block_start(maj, maj);
             for (size_t row = 0; row < num_major_simd().remaining_bits; row++) {
                 c[row] = block[row * num_minor_simd_padded()];
@@ -180,27 +191,28 @@ void simd_bit_table<W>::do_square_transpose() {
 
         // handle Bni
         for (size_t min = 0; min < num_major_simd().number_of_words; min++) {
-            bitword<W> c[W] = { 0 };
+            bitword<W> c[W];
+            clear_bitword_array(c);
             bitword<W> *block_bottom = block_start(maj, min);
             bitword<W> *block_right = block_start(min, maj);
 
-            // copy Bni into c
+            // copy Bni into C
             for (size_t row = 0; row < num_major_simd().remaining_bits; row++) {
                 c[row] = block_bottom[row * num_minor_simd_padded()];
             }
 
-            // transpose c
+            // transpose C
             bitword<W>::inplace_transpose_square(c,0);
 
-            // swap c and Ain
+            // swap C and Ain
             for (size_t row = 0; row < W; row++) {
                 std::swap(
-                    block_right + row * num_minor_simd_padded(),
-                    c + row
+                    *(block_right + row * num_minor_simd_padded()),
+                    *(c + row)
                 );
             }
 
-            // copy top rows of c into Bni
+            // copy top rows of C into Bni
             for (size_t row = 0; row < num_major_simd().remaining_bits; row++) {
                 block_bottom[row * num_minor_simd_padded()] = c[row];
             }
@@ -226,20 +238,28 @@ simd_bit_table<W> simd_bit_table<W>::slice_maj(size_t maj_start_bit, size_t maj_
 
 template <size_t W>
 void simd_bit_table<W>::transpose_into(simd_bit_table<W> &out) const {
-    assert(out.num_simd_words_minor == num_simd_words_major);
-    assert(out.num_simd_words_major == num_simd_words_minor);
+    assert(is_major_padded() && out.is_major_padded());
+    assert(out.num_minor_simd_padded() == num_major_simd_padded().number_of_words);
+    assert(out.num_major_simd_padded().number_of_words == num_minor_simd_padded());
 
+    size_t num_simd_words_major = num_major_simd_padded().number_of_words;
+    size_t num_simd_words_minor = num_minor_simd_padded();
     for (size_t maj_high = 0; maj_high < num_simd_words_major; maj_high++) {
         for (size_t min_high = 0; min_high < num_simd_words_minor; min_high++) {
             for (size_t maj_low = 0; maj_low < W; maj_low++) {
-                size_t src_index = (maj_low + (maj_high << bitword<W>::BIT_POW)) * num_simd_words_minor + min_high;
-                size_t dst_index = (maj_low + (min_high << bitword<W>::BIT_POW)) * out.num_simd_words_minor + maj_high;
-                out.data.ptr_simd[dst_index] = data.ptr_simd[src_index];
+                bitword<W> *src = block_start(maj_high, min_high) + maj_low;
+                bitword<W> *dst = block_start(min_high, maj_high) + maj_low;
+                *dst = *src;
             }
         }
     }
 
-    exchange_low_indices(out);
+    for (size_t maj = 0; maj < out.num_major_simd().number_of_words; maj++) {
+        for (size_t min = 0; min < out.num_minor_simd_padded(); min++) {
+            bitword<W> *block = out.block_start(maj, min);
+            bitword<W>::inplace_transpose_square(block, num_minor_simd_padded());
+        }
+    }
 }
 
 template <size_t W>

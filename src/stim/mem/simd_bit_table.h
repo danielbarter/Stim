@@ -40,19 +40,15 @@ struct relative_size {
 template <size_t W>
 struct simd_bit_table {
 private:
-    size_t num_bits_major_padded;
-    size_t num_bits_minor_padded; // always divisble by W
     size_t num_bits_major;
     size_t num_bits_minor;
-
-public:
+    size_t num_bits_major_padded;
+    size_t num_bits_minor_padded; // always divisble by W
+  public:
     simd_bits<W> data;
 
-    /// return pointer to first row of an simd square
-    inline bitword<W> *block_start(size_t maj, size_t min) const;
-
     /// Creates zero initialized table.
-    simd_bit_table(size_t num_bits_major, size_t num_bits_minor);
+    simd_bit_table(size_t bits_major, size_t bits_minor);
     /// Creates a randomly initialized table.
     static simd_bit_table random(
         size_t num_randomized_major_bits, size_t num_randomized_minor_bits, std::mt19937_64 &rng);
@@ -110,6 +106,9 @@ public:
 
     /// Sets all bits in the table to zero.
     void clear();
+
+    /// return pointer to first row of an simd square
+    inline bitword<W> *block_start(size_t maj, size_t min) const;
 
     /// Number of simd words in a column (row) + remaining bits assuming row (column) major indexing.
     inline relative_size num_major_simd() const {
@@ -275,6 +274,15 @@ public:
         return num_bits_minor_padded;
     }
 
+    inline bool is_major_padded() const {
+        if (num_major_simd_padded().remaining_bits == 0) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
     /// Returns a padded description of the table's contents.
     std::string str() const;
     /// Returns a truncated square description of the table's contents.
@@ -292,6 +300,6 @@ constexpr uint8_t lg(size_t k) {
 
 }  // namespace stim
 
-// #include "stim/mem/simd_bit_table.inl"
+#include "stim/mem/simd_bit_table.inl"
 
 #endif

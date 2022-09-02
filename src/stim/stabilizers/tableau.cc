@@ -44,7 +44,7 @@ void Tableau::expand(size_t new_num_qubits) {
     }
 
     // Move state to temporary storage then re-allocate to make room for additional qubits.
-    size_t old_num_simd_words = xs.xt.num_simd_words_major;
+    size_t old_num_simd_words = xs.xt.num_major_simd_padded().number_of_words;
     size_t old_num_qubits = num_qubits;
     Tableau old_state = std::move(*this);
     this->~Tableau();
