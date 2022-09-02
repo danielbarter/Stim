@@ -48,6 +48,9 @@ private:
 public:
     simd_bits<W> data;
 
+    /// return pointer to first row of an simd square
+    inline bitword<W> *block_start(size_t maj, size_t min) const;
+
     /// Creates zero initialized table.
     simd_bit_table(size_t num_bits_major, size_t num_bits_minor);
     /// Creates a randomly initialized table.
@@ -249,32 +252,26 @@ public:
 
     /// Number of simd words in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_simd_padded() const {
-        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded / W;
     }
     /// Number of 64 bit words in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_u64_padded() const {
-        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded / (8 * sizeof(uint64_t));
     }
     /// Number of 32 bit words in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_u32_padded() const {
-        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded / (8 * sizeof(uint32_t));
     }
     /// Number of 16 bit words in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_u16_padded() const {
-        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded / (8 * sizeof(uint16_t));
     }
     /// Number of 8 bit words in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_u8_padded() const {
-        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded / (8 * sizeof(uint8_t));
     }
     /// Number of bits in a padded row (column) assuming row (column) major indexing.
     inline size_t num_minor_bits_padded() const {
-        assert(num_bits_minor_padded % W == 0);
         return num_bits_minor_padded;
     }
 
