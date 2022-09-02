@@ -151,7 +151,7 @@ void simd_bit_table<W>::do_square_transpose() {
     // transpose the blocks Aij
     // if we are padded in both axes, this transposes all blocks.
     // if we are not padded in the major axis, we miss the last row.
-    for (size_t maj = 0; maj < num_major_simd().number_of_words; maj++) {
+    for (size_t maj = 0; maj < num_major_simd_padded().number_of_words; maj++) {
         for (size_t min = 0; min < num_minor_simd_padded(); min++) {
             bitword<W> *block = block_start(maj, min);
             bitword<W>::inplace_transpose_square(block, num_minor_simd_padded());
@@ -161,8 +161,8 @@ void simd_bit_table<W>::do_square_transpose() {
     // swap Aij with Aji.
     // if we are padded in both axes, this swaps all required blocks.
     // if we are note padded in the major axis, we need to handle the last row and column
-    for (size_t maj = 0; maj < num_major_simd().number_of_words; maj++) {
-        for (size_t min = maj + 1; min < num_major_simd().number_of_words; min++) {
+    for (size_t maj = 0; maj < num_major_simd_padded().number_of_words; maj++) {
+        for (size_t min = maj + 1; min < num_minor_simd_padded(); min++) {
             for (size_t row = 0; row < W; row++) {
                 std::swap(
                     *(block_start(maj,min) + row * num_minor_simd_padded()),
@@ -173,31 +173,31 @@ void simd_bit_table<W>::do_square_transpose() {
     }
 
     if (! is_major_padded()) {
-        size_t maj = num_major_simd().number_of_words;
+        size_t maj = num_major_simd_padded().number_of_words;
 
         // handle Bnn
         {
             bitword<W> c[W];
             clear_bitword_array(c);
             bitword<W> *block = block_start(maj, maj);
-            for (size_t row = 0; row < num_major_simd().remaining_bits; row++) {
+            for (size_t row = 0; row < num_major_simd_padded().remaining_bits; row++) {
                 c[row] = block[row * num_minor_simd_padded()];
             }
             bitword<W>::inplace_transpose_square(c,0);
-            for (size_t row = 0; row < num_major_simd().remaining_bits; row++) {
+            for (size_t row = 0; row < num_major_simd_padded().remaining_bits; row++) {
                 block[row * num_minor_simd_padded()] = c[row];
             }
         }
 
         // handle Bni
-        for (size_t min = 0; min < num_major_simd().number_of_words; min++) {
+        for (size_t min = 0; min < num_major_simd_padded().number_of_words; min++) {
             bitword<W> c[W];
             clear_bitword_array(c);
             bitword<W> *block_bottom = block_start(maj, min);
             bitword<W> *block_right = block_start(min, maj);
 
             // copy Bni into C
-            for (size_t row = 0; row < num_major_simd().remaining_bits; row++) {
+            for (size_t row = 0; row < num_major_simd_padded().remaining_bits; row++) {
                 c[row] = block_bottom[row * num_minor_simd_padded()];
             }
 
@@ -213,7 +213,7 @@ void simd_bit_table<W>::do_square_transpose() {
             }
 
             // copy top rows of C into Bni
-            for (size_t row = 0; row < num_major_simd().remaining_bits; row++) {
+            for (size_t row = 0; row < num_major_simd_padded().remaining_bits; row++) {
                 block_bottom[row * num_minor_simd_padded()] = c[row];
             }
         }

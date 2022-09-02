@@ -177,9 +177,12 @@ TEST_EACH_WORD_SIZE_W(simd_bit_table, inverse_assuming_lower_triangular, {
         ".1.1");
 })
 
+void debug_stub() {}
+
 TEST_EACH_WORD_SIZE_W(simd_bit_table, transposed, {
     auto m = simd_bit_table<W>::identity(4);
     m[3][1] = true;
+    debug_stub();
     ASSERT_EQ(
         m.str(4),
         "1...\n"
