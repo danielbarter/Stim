@@ -21,6 +21,12 @@
 
 namespace stim {
 
+/// struct for storing row size relative to some word size
+struct row_padding_size {
+    size_t number_of_words;
+    size_t remaining_bits;
+};
+
 /// A 2d array of bit-packed booleans, padded and aligned to make simd operations more efficient.
 ///
 /// The table contents are indexed by a major axis (not contiguous in memory) then a minor axis (contiguous in memory).
@@ -32,12 +38,17 @@ namespace stim {
 /// intended size has to be stored separately.
 template <size_t W>
 struct simd_bit_table {
-    size_t num_simd_words_major;
-    size_t num_simd_words_minor;
+private:
+    size_t num_bits_major_padded;
+    size_t num_bits_minor_padded; // always divisble by W
+
+public:
+    size_t num_bits_major;
+    size_t num_bits_minor;
     simd_bits<W> data;
 
     /// Creates zero initialized table.
-    simd_bit_table(size_t min_bits_major, size_t min_bits_minor);
+    simd_bit_table(size_t num_bits_major, size_t num_bits_minor);
     /// Creates a randomly initialized table.
     static simd_bit_table random(
         size_t num_randomized_major_bits, size_t num_randomized_minor_bits, std::mt19937_64 &rng);
@@ -73,11 +84,11 @@ struct simd_bit_table {
 
     /// Returns a reference to a row (column) of the table, when using row (column) major indexing.
     inline simd_bits_range_ref<W> operator[](size_t major_index) {
-        return data.word_range_ref(major_index * num_simd_words_minor, num_simd_words_minor);
+        return data.word_range_ref(major_index * num_minor_simd_padded(), num_minor_simd_padded());
     }
     /// Returns a const reference to a row (column) of the table, when using row (column) major indexing.
     inline const simd_bits_range_ref<W> operator[](size_t major_index) const {
-        return data.word_range_ref(major_index * num_simd_words_minor, num_simd_words_minor);
+        return data.word_range_ref(major_index * num_minor_simd_padded(), num_minor_simd_padded());
     }
 
     /// Square matrix multiplication (assumes row major indexing). n is the diameter of the matrix.
@@ -96,46 +107,74 @@ struct simd_bit_table {
     /// Sets all bits in the table to zero.
     void clear();
 
-    /// Number of 64 bit words in a column (row) assuming row (column) major indexing.
-    inline size_t num_major_u64_padded() const {
-        return num_simd_words_major * (sizeof(bitword<W>) / sizeof(uint64_t));
+    /// Number of simd words in a column (row) + remaining bits assuming row (column) major indexing.
+    inline row_padding_size num_major_simd_padded() const {
+        size_t d = W;
+        row_padding_size result;
+        result.number_of_words = num_bits_major_padded / d;
+        result.remaining_bits = num_bits_major_padded % d;
+        return result;
     }
-    /// Number of 32 bit words in a column (row) assuming row (column) major indexing.
-    inline size_t num_major_u32_padded() const {
-        return num_simd_words_major * (sizeof(bitword<W>) / sizeof(uint32_t));
+    /// Number of 64 bit words in a column (row) + remaining bits assuming row (column) major indexing.
+    inline row_padding_size num_major_u64_padded() const {
+        size_t d = 8 * sizeof(uint64_t);
+        row_padding_size result;
+        result.number_of_words = num_bits_major_padded / d;
+        result.remaining_bits = num_bits_major_padded % d;
+        return result;
     }
-    /// Number of 16 bit words in a column (row) assuming row (column) major indexing.
-    inline size_t num_major_u16_padded() const {
-        return num_simd_words_major * (sizeof(bitword<W>) / sizeof(uint16_t));
+    /// Number of 32 bit words in a column (row) + remaining bits assuming row (column) major indexing.
+    inline row_padding_size num_major_u32_padded() const {
+        size_t d = 8 * sizeof(uint32_t);
+        row_padding_size result;
+        result.number_of_words = num_bits_major_padded / d;
+        result.remaining_bits = num_bits_major_padded % d;
+        return result;
     }
-    /// Number of 8 bit words in a column (row) assuming row (column) major indexing.
-    inline size_t num_major_u8_padded() const {
-        return num_simd_words_major * (sizeof(bitword<W>) / sizeof(uint8_t));
+    /// Number of 16 bit words in a column (row) + remaining bits assuming row (column) major indexing.
+    inline row_padding_size num_major_u16_padded() const {
+        size_t d = 8 * sizeof(uint16_t);
+        row_padding_size result;
+        result.number_of_words = num_bits_major_padded / d;
+        result.remaining_bits = num_bits_major_padded % d;
+        return result;
+    }
+    /// Number of 8 bit words in a column (row) + remaining bits assuming row (column) major indexing.
+    inline row_padding_size num_major_u8_padded() const {
+        size_t d = 8 * sizeof(uint8_t);
+        row_padding_size result;
+        result.number_of_words = num_bits_major_padded / d;
+        result.remaining_bits = num_bits_major_padded % d;
+        return result;
     }
     /// Number of bits in a column (row) assuming row (column) major indexing.
     inline size_t num_major_bits_padded() const {
-        return num_simd_words_major * W;
+        return num_bits_major_padded;
     }
 
+    /// Number of simd words in a row (column) assuming row (column) major indexing.
+    inline size_t num_minor_simd_padded() const {
+        return num_bits_minor_padded / W;
+    }
     /// Number of 64 bit words in a row (column) assuming row (column) major indexing.
     inline size_t num_minor_u64_padded() const {
-        return num_simd_words_minor * (sizeof(bitword<W>) / sizeof(uint64_t));
+        return num_bits_minor_padded / (8 * sizeof(uint64_t));
     }
     /// Number of 32 bit words in a row (column) assuming row (column) major indexing.
     inline size_t num_minor_u32_padded() const {
-        return num_simd_words_minor * (sizeof(bitword<W>) / sizeof(uint32_t));
+        return num_bits_minor_padded / (8 * sizeof(uint32_t));
     }
     /// Number of 16 bit words in a row (column) assuming row (column) major indexing.
     inline size_t num_minor_u16_padded() const {
-        return num_simd_words_minor * (sizeof(bitword<W>) / sizeof(uint16_t));
+        return num_bits_minor_padded / (8 * sizeof(uint16_t));
     }
     /// Number of 8 bit words in a row (column) assuming row (column) major indexing.
     inline size_t num_minor_u8_padded() const {
-        return num_simd_words_minor * (sizeof(bitword<W>) / sizeof(uint8_t));
+        return num_bits_minor_padded / (8 * sizeof(uint8_t));
     }
     /// Number of bits in a row (column) assuming row (column) major indexing.
     inline size_t num_minor_bits_padded() const {
-        return num_simd_words_minor * W;
+        return num_bits_minor_padded;
     }
 
     /// Returns a padded description of the table's contents.
@@ -155,6 +194,6 @@ constexpr uint8_t lg(size_t k) {
 
 }  // namespace stim
 
-#include "stim/mem/simd_bit_table.inl"
+// #include "stim/mem/simd_bit_table.inl"
 
 #endif

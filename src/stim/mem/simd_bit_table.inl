@@ -17,14 +17,19 @@
 #include <cstring>
 #include <sstream>
 
+#include "stim/mem/simd_bit_table.h"
+
 namespace stim {
 
 template <size_t W>
-simd_bit_table<W>::simd_bit_table(size_t min_bits_major, size_t min_bits_minor)
-    : num_simd_words_major(min_bits_to_num_simd_words<W>(min_bits_major)),
-      num_simd_words_minor(min_bits_to_num_simd_words<W>(min_bits_minor)),
-      data(min_bits_to_num_bits_padded<W>(min_bits_minor) * min_bits_to_num_bits_padded<W>(min_bits_major)) {
-}
+simd_bit_table<W>::simd_bit_table(size_t num_bits_major, size_t num_bits_minor)
+    : num_bits_major(num_bits_major),
+      num_bits_minor(num_bits_minor),
+      num_bits_major_padded(num_bits_major),
+      num_bits_minor_padded(min_bits_to_num_bits_padded<W>(num_bits_minor)),
+      data(num_bits_major * min_bits_to_num_bits_padded<W>(num_bits_minor)) {}
+
+
 
 template <size_t W>
 simd_bit_table<W> simd_bit_table<W>::identity(size_t n) {
@@ -42,8 +47,9 @@ void simd_bit_table<W>::clear() {
 
 template <size_t W>
 bool simd_bit_table<W>::operator==(const simd_bit_table<W> &other) const {
-    return num_simd_words_minor == other.num_simd_words_minor && num_simd_words_major == other.num_simd_words_major &&
-           data == other.data;
+    return num_bits_major == other.num_bits_major
+        && num_bits_minor == other.num_bits_minor
+        && data == other.data;
 }
 
 template <size_t W>
